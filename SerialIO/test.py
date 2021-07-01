@@ -2,7 +2,6 @@
 This is a simple script to test the module
 '''
 
-
 # Import the module
 import serialio
 
