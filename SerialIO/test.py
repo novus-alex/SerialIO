@@ -18,3 +18,4 @@ serialio.read()
 
 # Get the serial parameters
 params = serialio.getSettings()
+print(params)

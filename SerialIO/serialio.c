@@ -1,16 +1,19 @@
 #include <Python.h>
 #include <windows.h>
 
+#define READ_TIMEOUT 500
+
 HANDLE hComm;
 const char *port;
 const int *baudrate;
 DCB params = {0};
+char lpBuf[2];
 
-static PyObject *openSerial(PyObject *self, PyObject *args) {
-    if (!PyArg_ParseTuple(args, "si", &port, &baudrate)) {
-        return NULL;
-    }
+static PyObject *openPortError;
+static PyObject *statePortError;
+static PyObject *readPortError;
 
+void openPort(const char *port) {
     hComm = CreateFileA(strcat("\\\\.\\", port),
         GENERIC_READ | GENERIC_WRITE,
         0,
@@ -18,9 +21,18 @@ static PyObject *openSerial(PyObject *self, PyObject *args) {
         OPEN_EXISTING,
         0,
         NULL);
+}
+
+static PyObject *openSerial(PyObject *self, PyObject *args) {
+    if (!PyArg_ParseTuple(args, "si", &port, &baudrate)) {
+        return NULL;
+    }
+
+    openPort(port);
 
     if (hComm == INVALID_HANDLE_VALUE) {
-        printf("Error while openning the port\n");
+        PyErr_SetString(openPortError, "Impossible to open the port (not connected ?)");
+        return Py_None;
     } else {
         params.DCBlength = sizeof(DCB);
         params.BaudRate = baudrate;
@@ -30,11 +42,21 @@ static PyObject *openSerial(PyObject *self, PyObject *args) {
 
         BOOL setState = SetCommState(hComm, &params);
         if (!setState) {
-            printf("Error while setting the serial parameters");
+            PyErr_SetString(statePortError, "Impossible to set the port state (check the wiring)");
+            return Py_None;
         }
     }
 
     return Py_None;
+}
+
+void HandleASuccessfulRead(char lpBuf[], DWORD dwRead) {
+      byte b;
+
+      for(int i = 0; i < (int)dwRead; i++) {
+            b = lpBuf[i];
+            printf("%c", b);
+      }
 }
 
 static PyObject *getSettings(PyObject *self) {
@@ -45,29 +67,47 @@ static PyObject *getSettings(PyObject *self) {
 
 static PyObject *readSerial(PyObject *self) {
     DWORD dwRead;
+    DWORD dwRes;
     BOOL fWaitingOnRead = FALSE;
     OVERLAPPED osReader = {0};
-    char a = "‏‏‎ ‎";
-    int i = 0;
-    char lpBuf[256];
 
-    BOOL serialReturn = ReadFile(hComm, lpBuf, sizeof(lpBuf), &dwRead, &osReader);
+    osReader.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-    if (!serialReturn) {
-        printf("Error while reading the port\n");
-    } else {
-        printf("%s", lpBuf);
+    if (osReader.hEvent == NULL)
+        printf("error3");
 
-        while (strcmp(&lpBuf[i], "\n") != 0) {
-            i = i + 1;
+    if (!fWaitingOnRead) {
+        if (!ReadFile(hComm, lpBuf, sizeof(lpBuf), &dwRead, &osReader)) {
+            if (GetLastError() != ERROR_IO_PENDING) {
+                PyErr_SetString(readPortError, "Impossible to read the port (check the wiring)");
+                return Py_None;
+            } else {
+                printf("error2");
+                fWaitingOnRead = TRUE;
+            }  
+        } else {    
+            HandleASuccessfulRead(lpBuf, dwRead);
         }
-
-        for (int c = 0; lpBuf[c] != lpBuf[i]; c++) {
-            strcpy(&lpBuf[c], &lpBuf[c+i]);
-        }
-
-        printf("%s", lpBuf);
     }
+
+    if (fWaitingOnRead) {
+        dwRes = WaitForSingleObject(osReader.hEvent, READ_TIMEOUT);
+        switch(dwRes) {
+            case WAIT_OBJECT_0:
+                if (!GetOverlappedResult(hComm, &osReader, &dwRead, FALSE))
+                    printf("Error");
+                else
+                    HandleASuccessfulRead(lpBuf, dwRead);
+                fWaitingOnRead = FALSE;
+                break;
+
+            case WAIT_TIMEOUT:
+                break;                       
+
+            default:
+                break;
+   }
+}
 
     return Py_None;
 }
@@ -89,5 +129,19 @@ static struct PyModuleDef serialiomodule = {
 };
 
 PyMODINIT_FUNC PyInit_serialio(void) {
-    return PyModule_Create(&serialiomodule);
+    PyObject *module;
+    module = PyModule_Create(&serialiomodule);
+
+    openPortError = PyErr_NewException("SerialIO.OpenPortError", NULL, NULL);
+    Py_INCREF(openPortError);
+    statePortError = PyErr_NewException("SerialIO.StatePortError", NULL, NULL);
+    Py_INCREF(openPortError);
+    readPortError = PyErr_NewException("SerialIO.ReadPortError", NULL, NULL);
+    Py_INCREF(openPortError);
+
+    PyModule_AddObject(module, "OpenPortError", "OpenPortError");
+    PyModule_AddObject(module, "StatePortError", "StatePortError");
+    PyModule_AddObject(module, "ReadPortError", "ReadPortError");
+
+    return module;
 }
