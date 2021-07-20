@@ -1,6 +1,13 @@
 # SerialIO
  * Python support for serial I/O
  
+```
+pip install ns-serial
+```
+```python
+import ns-serial as serial
+```
+
 This module was originally created by novus-alex,
 <br>https://github.com/novus-alex
 <br>https://github.com/novus-alex/SerialIO
@@ -27,7 +34,7 @@ SOFTWARE.
 
 ## Quick Examples
 ```python
-import serialio as serial
+import ns-serial as serial
 
 hComm = serial.Serial("YourPort", Baudrate, Timeout)
 data = serial.read(hComm) # Wait until receive data from serial port
