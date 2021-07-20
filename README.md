@@ -2,8 +2,8 @@
  * Python support for serial I/O
  
 This module was originally created by novus-alex,
-https://github.com/novus-alex
-https://github.com/novus-alex/SerialIO
+<br>https://github.com/novus-alex
+<br>https://github.com/novus-alex/SerialIO
  
 Copyright (c) 2021 by Alexandre Hachet
 
