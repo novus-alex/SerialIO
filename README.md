@@ -30,8 +30,5 @@ SOFTWARE.
 import serialio as serial
 
 hComm = serial.Serial("YourPort", Baudrate, Timeout)
-data = hComm.read() # Wait until receive data from serial port
-
-# Settings
-serial_parameters = hComm.getSettings() # Return a list like this: [PORT, BAUDRATE, TIMEOUT]
+data = serial.read(hComm) # Wait until receive data from serial port
 ```
