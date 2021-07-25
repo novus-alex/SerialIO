@@ -18,5 +18,11 @@ class Serial(object):
 	def write(self, msg):
 		serialio.write(self.hComm, msg)
 
+	def close(self):
+		serialio.close(self.hComm)
+
 ser = Serial("COM3", 9600, 1)
 ser.write("test")
+data = ser.read()
+print(data)
+ser.close()

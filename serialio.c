@@ -36,6 +36,7 @@ DCB params = {0};
 static PyObject *openPortError;
 static PyObject *statePortError;
 static PyObject *readPortError;
+static PyObject *writePortError;
 
 HANDLE openPort(const char *port) {
     HANDLE hComm;
@@ -121,13 +122,24 @@ static PyObject *readPort(PyObject *self, PyObject *args) {
     com_port = PyLong_AsVoidPtr(python_handle);
 
     Status = SetCommMask(com_port, EV_RXCHAR);
+    if (Status == FALSE) {
+        PyErr_SetString(statePortError, "Impossible to set the port state (check the wiring)");
+        return NULL;
+    }
+
     Status = WaitCommEvent(com_port, &dwEventMask, NULL);
     if (Status == FALSE) {
-        return Py_None;
+        PyErr_SetString(statePortError, "Impossible to set the port state (check the wiring)");
+        return NULL;
     }
 
     do {
         Status = ReadFile(com_port, &ReadData, sizeof(ReadData), &NoBytesRead, NULL);
+        if (Status == FALSE) {
+            PyErr_SetString(readPortError, "Impossible to read the port");
+            return NULL;
+        }
+
         SerialBuffer[loop] = ReadData;
         ++loop;
     }
@@ -139,24 +151,34 @@ static PyObject *readPort(PyObject *self, PyObject *args) {
 }
 
 static PyObject *writePort(PyObject *self, PyObject *args) {
-    char WriteData[64] = {0};
+    /*
+     * The write func can write only str to the port
+     * Buffer is 64 char size
+     * The func is returning None if it's a success
+     *
+     */
+
+    char *WriteData;
     DWORD BytesWritten = 0;
     BOOL Status;
     PyObject *python_handle;
     HANDLE com_port;
 
-    printf("test\n");
-
-    if (!PyArg_ParseTuple(args, "Os", &python_handle, WriteData)) {
+    if (!PyArg_ParseTuple(args, "Os", &python_handle, &WriteData)) {
         return NULL;
     }
     com_port = PyLong_AsVoidPtr(python_handle);
 
-    printf("Test: %s\n", WriteData);
+    Status = SetCommMask(com_port, EV_TXEMPTY);
+    if (Status == FALSE) {
+        PyErr_SetString(statePortError, "Impossible to set the port state (check the wiring)");
+        return NULL;
+    }
 
     Status = WriteFile(com_port, WriteData, sizeof(WriteData), &BytesWritten, NULL);
     if (Status == FALSE) {
-        printf("\nFail to Written");
+        PyErr_SetString(writePortError, "Impossible to write to the port");
+        return NULL;
     }
 
     return Py_None;
@@ -165,6 +187,7 @@ static PyObject *writePort(PyObject *self, PyObject *args) {
 static PyObject *closePort(PyObject *self, PyObject *args) {
     /*
      * Simple close port func, only working with opened ports
+     * Returning None
      *
      */
 
@@ -207,10 +230,13 @@ PyMODINIT_FUNC PyInit_serialio(void) {
     Py_INCREF(openPortError);
     readPortError = PyErr_NewException("SerialIO.ReadPortError", NULL, NULL);
     Py_INCREF(openPortError);
+    writePortError = PyErr_NewException("SerialIO.ReadPortError", NULL, NULL);
+    Py_INCREF(writePortError);
 
     PyModule_AddObject(module, "OpenPortError", openPortError);
     PyModule_AddObject(module, "StatePortError", statePortError);
     PyModule_AddObject(module, "ReadPortError", readPortError);
+    PyModule_AddObject(module, "WritePortError", writePortError);
 
     return module;
 }
