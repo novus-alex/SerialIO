@@ -11,9 +11,9 @@ class Serial(object):
 		self.hComm = serialio.Serial(self.port, self.baudrate)		# Opening the port
 
 	def read(self):
-		data = serialio.read(self.hComm)							# Listening to serial port
-		splited = data.split() 										# To remove \r\n(\n)
-		return splited[0] 											# Returning the data
+		data = serialio.read(self.hComm)				# Listening to serial port
+		splited = data.split() 						# To remove \r\n(\n)
+		return splited[0] 						# Returning the data
 
 	def write(self, msg):
 		serialio.write(self.hComm, msg)
